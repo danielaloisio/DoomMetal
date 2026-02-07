@@ -1,6 +1,6 @@
 # DoomMetal
 
-A restored and cleaned-up release of the DOOM source code maintained here as the "DoomMetal" project. This repository contains the classic DOOM engine sources; you still need a valid DOOM IWAD (for example `doom.wad`) to run the game data.
+A restored and cleaned-up release of the DOOM source code maintained here as the "DoomMetal" project. This repository contains the classic DOOM engine sources; you still need a valid DOOM IWAD (for example `doom.wad`) to run the game data, Shareware version work fine, or you can buy the full version on Steam.([DOOM STEAM](#https://store.steampowered.com/app/2280/DOOM__DOOM_II/)).
 
 This README explains how to build the project on common desktop platforms (Linux, macOS, Windows) using CMake and how to run the resulting executable.
 
@@ -16,7 +16,7 @@ See `LICENSE.TXT` in the repository root. This source tree is distributed under 
 
 - Supported platforms: Linux, macOS, Windows (the code uses SDL2 for audio/video and CMake as the build system).
 - A C compiler / toolchain (gcc/clang on Unix-like systems, MSVC or MinGW on Windows).
-- CMake (recommended minimum 3.10, newer is fine).
+- CMake (recommended minimum 3.21, newer is fine).
 - A generator: make, Ninja, or an IDE/Visual Studio on Windows.
 - SDL2 development libraries (required for audio/video/input). The package name varies by platform.
 - A valid DOOM IWAD (for example `doom.wad`). This project does not include the IWAD — place your copy next to the built executable or provide the path when running.
@@ -111,16 +111,8 @@ On Windows (PowerShell / CMD):
 
 ```powershell
 # From project root (Visual Studio generator example)
-.
+
 #  Copy your IWAD next to the built binary and run from the build dir
 build\Release\DoomMetal.exe
 ```
-
-If the executable cannot find an IWAD, it will typically print an error indicating the missing file — provide the full path to your IWAD as the first positional argument if needed.
-
----
-
-## Notes & Contributing
-
-- This repository preserves the original DOOM source heritage. If you make improvements, consider documenting them and opening a patch or pull request.
 ---
