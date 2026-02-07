@@ -21,6 +21,14 @@
 //
 //-----------------------------------------------------------------------------
 
+#include <stdio.h>
+#include <stdlib.h>
+
+#ifdef _WIN32
+#include <SDL.h>
+#include <SDL_main.h>
+#endif
+
 static const char
 rcsid[] = "$Id: i_main.c,v 1.4 1997/02/03 22:45:10 b1 Exp $";
 

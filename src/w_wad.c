@@ -27,15 +27,23 @@ rcsid[] = "$Id: w_wad.c,v 1.5 1997/02/03 16:47:57 b1 Exp $";
 
 
 #include <ctype.h>
+#include <sys/stat.h>
+#ifndef _WIN32
 #include <sys/types.h>
+#endif
 #include <string.h>
+#ifndef _WIN32
 #include <unistd.h>
+#endif
 #include <stdlib.h>
 #include <fcntl.h>
-#include <sys/stat.h>
 
 #ifdef NORMALUNIX
+#ifndef _WIN32
 #include <alloca.h>
+#else
+#include <malloc.h>
+#endif
 #endif
 
 #ifndef O_BINARY
@@ -70,11 +78,14 @@ void**			lumpcache;
 
 #define strcmpi	strcasecmp
 
+#ifndef _WIN32
 void strupr (char* s)
 {
     while (*s) { *s = toupper(*s); s++; }
 }
+#endif
 
+#ifndef _WIN32
 int filelength (int handle) 
 { 
     struct stat	fileinfo;
@@ -84,6 +95,7 @@ int filelength (int handle)
 
     return fileinfo.st_size;
 }
+#endif
 
 
 void
