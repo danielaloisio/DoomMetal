@@ -1,81 +1,118 @@
+# DoomMetal
 
-Here it is, at long last.  The DOOM source code is released for your
-non-profit use.  You still need real DOOM data to work with this code.
-If you don't actually own a real copy of one of the DOOMs, you should
-still be able to find them at software stores.
+A simple and clean version of the DOOM source code, maintained here as the "DoomMetal" project. This repository contains the classic DOOM engine sources; you still need a valid DOOM IWAD (for example `doom.wad`) to run the game data, Shareware version work fine, or you can buy the full version on Steam.([DOOM STEAM](https://store.steampowered.com/app/2280/DOOM__DOOM_II/)).
 
-Many thanks to Bernd Kreimeier for taking the time to clean up the
-project and make sure that it actually works.  Projects tends to rot if
-you leave it alone for a few years, and it takes effort for someone to
-deal with it again.
+This README explains how to build the project on common desktop platforms (Linux, macOS, Windows) using CMake and how to run the resulting executable.
 
-The bad news:  this code only compiles and runs on linux.  We couldn't
-release the dos code because of a copyrighted sound library we used
-(wow, was that a mistake -- I write my own sound code now), and I
-honestly don't even know what happened to the port that microsoft did
-to windows.
+---
 
-Still, the code is quite portable, and it should be straightforward to
-bring it up on just about any platform.
+## License
 
-I wrote this code a long, long time ago, and there are plenty of things
-that seem downright silly in retrospect (using polar coordinates for
-clipping comes to mind), but overall it should still be a usefull base
-to experiment and build on.
+See `LICENSE.TXT` in the repository root. This source tree is distributed under the terms listed there (GNU GPL v2 as noted in the original release). You are responsible for owning a valid copy of the DOOM IWAD data files to use with this engine.
 
-The basic rendering concept -- horizontal and vertical lines of constant
-Z with fixed light shading per band was dead-on, but the implementation
-could be improved dramatically from the original code if it were
-revisited.  The way the rendering proceded from walls to floors to
-sprites could be collapsed into a single front-to-back walk of the bsp
-tree to collect information, then draw all the contents of a subsector
-on the way back up the tree.  It requires treating floors and ceilings
-as polygons, rather than just the gaps between walls, and it requires
-clipping sprite billboards into subsector fragments, but it would be
-The Right Thing.
+---
 
-The movement and line of sight checking against the lines is one of the
-bigger misses that I look back on.  It is messy code that had some
-failure cases, and there was a vastly simpler (and faster) solution
-sitting in front of my face.  I used the BSP tree for rendering things,
-but I didn't realize at the time that it could also be used for
-environment testing.  Replacing the line of sight test with a bsp line
-clip would be pretty easy.  Sweeping volumes for movement gets a bit
-tougher, and touches on many of the challenges faced in quake / quake2
-with edge bevels on polyhedrons.
+## Requirements
 
-Some project ideas:
+- Supported platforms: Linux, macOS, Windows (the code uses SDL2 for audio/video and CMake as the build system).
+- A C compiler / toolchain (gcc/clang on Unix-like systems, MSVC or MinGW on Windows).
+- CMake (recommended minimum 3.21, newer is fine).
+- A generator: make, Ninja, or an IDE/Visual Studio on Windows.
+- SDL2 development libraries (required for audio/video/input). The package name varies by platform.
+- A valid DOOM IWAD (for example `doom.wad`). This project does not include the IWAD — place your copy next to the built executable or provide the path when running.
 
-Port it to your favorite operating system.
+Platform-specific dependency hints:
 
-Add some rendering features -- transparency, look up / down, slopes,
-etc.
+- Debian/Ubuntu (Linux):
 
-Add some game features -- weapons, jumping, ducking, flying, etc.
+```bash
+sudo apt update
+sudo apt install build-essential cmake libsdl2-dev
+```
 
-Create a packet server based internet game.
+- Fedora (Linux):
 
-Create a client / server based internet game.
+```bash
+sudo dnf install @development-tools cmake SDL2-devel
+```
 
-Do a 3D accelerated version.  On modern hardware (fast pentium + 3DFX)
-you probably wouldn't even need to be clever -- you could just draw the
-entire level and get reasonable speed.  With a touch of effort, it should
-easily lock at 60 fps (well, there are some issues with DOOM's 35 hz
-timebase...).  The biggest issues would probably be the non-power of two
-texture sizes and the walls composed of multiple textures.
+- Arch (Linux):
 
+```bash
+sudo pacman -Syu base-devel cmake sdl2
+```
 
-I don't have a real good guess at how many people are going to be
-playing with this, but if significant projects are undertaken, it would
-be cool to see a level of community cooperation.  I know that most early
-projects are going to be rough hacks done in isolation, but I would be
-very pleased to see a coordinated 'net release of an improved, backwards
-compatable version of DOOM on multiple platforms next year.
+- macOS (Homebrew):
 
-Have fun.
+```bash
+brew update
+brew install cmake sdl2
+```
 
-John Carmack
-12-23-97
+- Windows (two common options):
+  - Visual Studio (recommended): install "Desktop development with C++" and CMake support; install SDL2 development files or use vcpkg to install SDL2.
+  - MSYS2/MinGW: open MSYS2 MinGW 64-bit shell and install packages:
 
-Copyright (c) ZeniMax Media Inc.
-Licensed under the GNU General Public License 2.0.
+```bash
+pacman -S mingw-w64-x86_64-toolchain mingw-w64-x86_64-cmake mingw-w64-x86_64-SDL2
+```
+
+---
+
+## Build (out-of-source, cross-platform)
+
+This repository uses CMake. We recommend an out-of-source build to keep generated files separate from the source tree. The examples below show common commands for each platform and generator.
+
+General (single-config generators like Make or Ninja):
+
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build -- -j$(nproc)
+```
+
+Note for macOS: `$(nproc)` may not be defined — use `sysctl -n hw.ncpu` or omit the parallel flag.
+
+For multi-config generators (Visual Studio on Windows) specify the configuration when building:
+
+```powershell
+# Example for Visual Studio (run in PowerShell or Developer Command Prompt)
+cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+cmake --build build --config Release
+```
+
+For Ninja (cross-platform):
+
+```bash
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+```
+
+Notes:
+- For a Debug build use `-DCMAKE_BUILD_TYPE=Debug` (or `--config Debug` for multi-config builds).
+- If you change critical CMake options, remove the `build` directory (or delete `CMakeCache.txt`) and reconfigure.
+- On Windows, if you use MSYS2/MinGW, run the commands from the appropriate MinGW shell so the correct toolchain is picked up.
+
+---
+
+## Running the executable
+
+After a successful build the engine binary will be located in the chosen build directory. On Unix-like systems the binary is typically named `DoomMetal`, on Windows `DoomMetal.exe`.
+
+Examples:
+
+```bash
+# Copy your IWAD next to the built binary and run from the build dir (Unix)
+cp /path/to/doom.wad build/
+cd build
+./DoomMetal
+```
+
+On Windows (PowerShell / CMD):
+
+```powershell
+# From project root (Visual Studio generator example)
+
+#  Copy your IWAD next to the built binary and run from the build dir
+build\Release\DoomMetal.exe
+```
+---
