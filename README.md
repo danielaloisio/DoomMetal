@@ -1,6 +1,6 @@
 # DoomMetal
 
-A restored and cleaned-up release of the DOOM source code maintained here as the "DoomMetal" project. This repository contains the classic DOOM engine sources; you still need a valid DOOM IWAD (for example `doom.wad`) to run the game data, Shareware version work fine, or you can buy the full version on Steam.([DOOM STEAM](https://store.steampowered.com/app/2280/DOOM__DOOM_II/)).
+A simple and clean version of the DOOM source code, maintained here as the "DoomMetal" project. This repository contains the classic DOOM engine sources; you still need a valid DOOM IWAD (for example `doom.wad`) to run the game data, Shareware version work fine, or you can buy the full version on Steam.([DOOM STEAM](https://store.steampowered.com/app/2280/DOOM__DOOM_II/)).
 
 This README explains how to build the project on common desktop platforms (Linux, macOS, Windows) using CMake and how to run the resulting executable.
 
