@@ -27,6 +27,7 @@ rcsid[] = "$Id: m_bbox.c,v 1.1 1997/02/03 22:45:10 b1 Exp $";
 #include <string.h>
 #include <stdio.h>
 
+#ifndef _WIN32
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -34,6 +35,7 @@ rcsid[] = "$Id: m_bbox.c,v 1.1 1997/02/03 22:45:10 b1 Exp $";
 #include <unistd.h>
 #include <netdb.h>
 #include <sys/ioctl.h>
+#endif
 
 #include "i_system.h"
 #include "d_event.h"
@@ -72,6 +74,8 @@ boolean NetListen (void);
 //
 // NETWORKING
 //
+
+#ifndef _WIN32
 
 int	DOOMPORT =	(IPPORT_USERRESERVED +0x1d );
 
@@ -253,7 +257,7 @@ void I_InitNetwork (void)
     
     // set up for network
     i = M_CheckParm ("-dup");
-    if (i && i< myargc-1)
+    if (i && i<myargc-1)
     {
 	doomcom->ticdup = myargv[i+1][0]-'0';
 	if (doomcom->ticdup < 1)
@@ -345,4 +349,29 @@ void I_NetCmd (void)
     else
 	I_Error ("Bad net cmd: %i\n",doomcom->command);
 }
+
+#else
+
+void I_InitNetwork (void)
+{
+    doomcom = malloc (sizeof (*doomcom) );
+    memset (doomcom, 0, sizeof(*doomcom) );
+    
+    doomcom->ticdup = 1;
+    doomcom->extratics = 0;
+
+    netgame = false;
+    doomcom->id = DOOMCOM_ID;
+    doomcom->numplayers = doomcom->numnodes = 1;
+    doomcom->deathmatch = false;
+    doomcom->consoleplayer = 0;
+}
+
+void I_NetCmd (void)
+{
+    I_Error ("Network gaming not supported on Windows\n");
+}
+
+#endif // _WIN32
+
 

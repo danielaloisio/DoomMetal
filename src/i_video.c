@@ -23,11 +23,12 @@
 //-----------------------------------------------------------------------------
 
 #include <stdlib.h>
+#ifndef _WIN32
 #include <unistd.h>
-#include <stdarg.h>
 #include <sys/time.h>
 #include <sys/types.h>
 #include <signal.h>
+#endif
 
 #include <SDL.h>
 

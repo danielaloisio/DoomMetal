@@ -29,10 +29,14 @@ rcsid[] = "$Id: m_misc.c,v 1.6 1997/02/03 22:45:10 b1 Exp $";
 
 #include <stdint.h>
 #include <sys/stat.h>
+#ifndef _WIN32
 #include <sys/types.h>
+#endif
 #include <fcntl.h>
 #include <stdlib.h>
+#ifndef _WIN32
 #include <unistd.h>
+#endif
 
 #include <ctype.h>
 
