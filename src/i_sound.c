@@ -88,78 +88,90 @@ Mix_Music*  current_music = NULL;
 // This function loads the sound data from the WAD lump,
 //  for single sound
 //
+//
+// This function loads the sound data from the WAD lump,
+//  for single sound
+//
 Mix_Chunk*
 getsfx
 ( char*         sfxname,
   int*          len )
 {
     unsigned char*      sfx;
-    unsigned char*      paddedsfx;
-    int                 i;
     int                 size;
-    int                 paddedsize;
     char                name[20];
     int                 sfxlump;
     Mix_Chunk*          chunk;
+    unsigned char*      wavbuf;
+    int                 wavsize;
+    int                 samplerate;
+    int                 samples;
 
-    
     // Get the sound data from the WAD, allocate lump
     //  in zone memory.
     sprintf(name, "ds%s", sfxname);
 
-    // Now, there is a severe problem with the
-    //  sound handling, in it is not (yet/anymore)
-    //  gamemode aware. That means, sounds from
-    //  DOOM II will be requested even with DOOM
-    //  shareware.
-    // The sound list is wired into sounds.c,
-    //  which sets the external variable.
-    // I do not do runtime patches to that
-    //  variable. Instead, we will use a
-    //  default sound for replacement.
     if ( W_CheckNumForName(name) == -1 )
       sfxlump = W_GetNumForName("dspistol");
     else
       sfxlump = W_GetNumForName(name);
     
     size = W_LumpLength( sfxlump );
-
-    // Debug.
-    // fprintf( stderr, "." );
-    //fprintf( stderr, " -loading  %s (lump %d, %d bytes)\n",
-    //	     sfxname, sfxlump, size );
-    //fflush( stderr );
-    
     sfx = (unsigned char*)W_CacheLumpNum( sfxlump, PU_STATIC );
 
-    // Pads the sound effect out to the mixing buffer size.
-    // The original realloc would interfere with zone memory.
-    paddedsize = ((size-8 + (SAMPLECOUNT-1)) / SAMPLECOUNT) * SAMPLECOUNT;
-
-    // Allocate from zone memory.
-    paddedsfx = (unsigned char*)Z_Malloc( paddedsize+8, PU_STATIC, 0 );
-    // ddt: (unsigned char *) realloc(sfx, paddedsize+8);
-    // This should interfere with zone memory handling,
-    //  which does not kick in in the soundserver.
-
-    // Now copy and pad.
-    memcpy(  paddedsfx, sfx, size );
-    for (i=size ; i<paddedsize+8 ; i++)
-        paddedsfx[i] = 128;
-
-    // Remove the cached lump.
-    Z_Free( sfx );
-    
-    // Preserve padded length.
-    *len = paddedsize;
-
-    chunk = Mix_QuickLoad_RAW(paddedsfx + 8, paddedsize);
-    
-    if (!chunk) {
-        fprintf(stderr, "Mix_QuickLoad_RAW failed for %s: %s\n", sfxname, Mix_GetError());
+    if (size < 8 || sfx[0] != 0x03 || sfx[1] != 0x00) {
+        Z_Free(sfx);
         return NULL;
     }
 
+    samplerate = sfx[2] | (sfx[3] << 8);
+    samples = sfx[4] | (sfx[5] << 8) | (sfx[6] << 16) | (sfx[7] << 24);
+
+    if (samples > size - 8)
+        samples = size - 8;
+
+    wavsize = 44 + samples;
+    wavbuf = (unsigned char*)Z_Malloc(wavsize, PU_STATIC, 0);
+
+    memcpy(wavbuf, "RIFF", 4);
+    int32_t chunksize = wavsize - 8;
+    memcpy(wavbuf + 4, &chunksize, 4);
+    memcpy(wavbuf + 8, "WAVE", 4);
+
+    memcpy(wavbuf + 12, "fmt ", 4);
+    int32_t fmtsize = 16;
+    memcpy(wavbuf + 16, &fmtsize, 4);
+    int16_t format = 1; // PCM
+    memcpy(wavbuf + 20, &format, 2);
+    int16_t channels = 1; // Mono
+    memcpy(wavbuf + 22, &channels, 2);
+    int32_t srate = samplerate;
+    memcpy(wavbuf + 24, &srate, 4);
+    int32_t byterate = srate * 1 * 1; // rate * channels * bps/8
+    memcpy(wavbuf + 28, &byterate, 4);
+    int16_t blockalign = 1;
+    memcpy(wavbuf + 32, &blockalign, 2);
+    int16_t bps = 8;
+    memcpy(wavbuf + 34, &bps, 2);
+
+    memcpy(wavbuf + 36, "data", 4);
+    int32_t datasize = samples;
+    memcpy(wavbuf + 40, &datasize, 4);
+
+    memcpy(wavbuf + 44, sfx + 8, samples);
+
+    SDL_RWops* rw = SDL_RWFromMem(wavbuf, wavsize);
+    chunk = Mix_LoadWAV_RW(rw, 1); // 1 = close rwops automatically
+
+    Z_Free(sfx);
+    Z_Free(wavbuf);
+
+    if (!chunk) {
+        fprintf(stderr, "Mix_LoadWAV_RW failed for %s: %s\n", sfxname, Mix_GetError());
+        return NULL;
+    }
+
+    *len = samples;
     return chunk;
 }
 
@@ -499,9 +511,21 @@ int I_RegisterSong(void* data)
 {
     SDL_RWops* rw;
     Mix_Music* music;
+    int size = 0;
     
     if (!data) {
         return 0;
+    }
+
+    for (int i=0; i<NUMMUSIC; i++) {
+        if (S_music[i].data == data) {
+            size = W_LumpLength(S_music[i].lumpnum);
+            break;
+        }
+    }
+
+    if (size == 0) {
+        size = 128 * 1024;
     }
 
     if (current_music) {
@@ -509,7 +533,7 @@ int I_RegisterSong(void* data)
         current_music = NULL;
     }
 
-    rw = SDL_RWFromMem(data, 64 * 1024);
+    rw = SDL_RWFromMem(data, size);
     
     if (!rw) {
         fprintf(stderr, "I_RegisterSong: SDL_RWFromMem failed\n");
