@@ -6,9 +6,9 @@ set(CMAKE_C_FLAGS_DEBUG "-g -O0")
 set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")
 add_definitions(-U__BIG_ENDIAN__ -DNORMALUNIX)
 
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(SDL2 REQUIRED sdl2)
-pkg_check_modules(SDL2_MIXER REQUIRED SDL2_mixer)
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake/sdl2)
+find_package(SDL2 REQUIRED)
+find_package(SDL2_MIXER REQUIRED)
 
 include_directories(${SDL2_INCLUDE_DIRS})
 include_directories(${SDL2_MIXER_INCLUDE_DIRS})
