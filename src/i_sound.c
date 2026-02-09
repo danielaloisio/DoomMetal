@@ -1,5 +1,4 @@
-
-// Emacs style mode select   -*- C++ -*- 
+// Emacs style mode select   -*- C++ -*-
 //-----------------------------------------------------------------------------
 //
 // $Id:$
@@ -28,7 +27,7 @@ rcsid[] = "$Id: i_unix.c,v 1.5 1997/02/03 22:45:10 b1 Exp $";
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
-
+#include <string.h>
 #include <math.h>
 
 #ifndef _WIN32
@@ -42,7 +41,6 @@ rcsid[] = "$Id: i_unix.c,v 1.5 1997/02/03 22:45:10 b1 Exp $";
 #endif
 
 #include <SDL.h>
-#include <SDL_mixer.h>
 
 #include "z_zone.h"
 
@@ -57,7 +55,6 @@ rcsid[] = "$Id: i_unix.c,v 1.5 1997/02/03 22:45:10 b1 Exp $";
 // Needed if SNDSERV is defined in doomdef.h
 char* sndserver_filename = "sndserver";
 
-
 // The number of internal mixing channels,
 //  the samples calculated for each mixing step,
 //  the size of the 16bit, 2 hardware channel (stereo)
@@ -65,63 +62,132 @@ char* sndserver_filename = "sndserver";
 
 
 // Needed for calling the actual sound output.
+#define SAMPLERATE		22050
 #define SAMPLECOUNT		512
 #define NUM_CHANNELS		8
-// It is 2 for 16bit, and 2 for two channels.
-#define BUFMUL                  4
-#define MIXBUFFERSIZE		(SAMPLECOUNT*BUFMUL)
 
-#define SAMPLERATE		22050	// Hz
-#define SAMPLESIZE		2   	// 16bit
+static SDL_AudioDeviceID audio_device = 0;
+static SDL_AudioSpec audio_spec;
 
-// The actual lengths of all sound effects.
-int 		lengths[NUMSFX];
-
-Mix_Chunk*  sound_chunks[NUMSFX];
-
-Mix_Music*  current_music = NULL;
-
-
-
-
-//
-// This function loads the sound data from the WAD lump,
-//  for single sound
-//
-//
-// This function loads the sound data from the WAD lump,
-//  for single sound
-//
-Mix_Chunk*
-getsfx
-( char*         sfxname,
-  int*          len )
+typedef struct
 {
-    unsigned char*      sfx;
-    int                 size;
-    char                name[20];
-    int                 sfxlump;
-    Mix_Chunk*          chunk;
-    unsigned char*      wavbuf;
-    int                 wavsize;
-    int                 samplerate;
-    int                 samples;
+    unsigned char* data;
+    int length;
+    int position;
+    int active;
+    int loop;
+    int volume;
+    int separation;
+    int pitch;
+    int sfx_id;
+} channel_t;
 
-    // Get the sound data from the WAD, allocate lump
-    //  in zone memory.
+static channel_t channels[NUM_CHANNELS];
+
+// Sound effects data
+typedef struct
+{
+    unsigned char* data;
+    int length;
+    int samplerate;
+} sound_t;
+
+static sound_t sounds[NUMSFX];
+static int lengths[NUMSFX];
+
+static int music_volume = 15;
+
+static SDL_mutex* audio_mutex = NULL;
+
+//
+// Audio callback - called by SDL to fill the audio buffer
+//
+static void I_AudioCallback(void* userdata, Uint8* stream, int len)
+{
+    int i, c;
+    Sint16* output = (Sint16*)stream;
+    int samples = len / 4;
+
+    memset(stream, 0, len);
+    
+    if (!audio_mutex) return;
+    
+    SDL_LockMutex(audio_mutex);
+
+    for (c = 0; c < NUM_CHANNELS; c++)
+    {
+        channel_t* chan = &channels[c];
+        
+        if (!chan->active || !chan->data)
+            continue;
+            
+        for (i = 0; i < samples && chan->position < chan->length; i++)
+        {
+            int sample = chan->data[chan->position];
+
+            Sint16 sample_16 = (Sint16)((sample - 128) << 8);
+
+            sample_16 = (sample_16 * chan->volume) / 127;
+
+            int left_vol = 255 - chan->separation;
+            int right_vol = chan->separation;
+
+            int left_sample = output[i * 2] + ((sample_16 * left_vol) / 255);
+            int right_sample = output[i * 2 + 1] + ((sample_16 * right_vol) / 255);
+
+            if (left_sample > 32767) left_sample = 32767;
+            if (left_sample < -32768) left_sample = -32768;
+            if (right_sample > 32767) right_sample = 32767;
+            if (right_sample < -32768) right_sample = -32768;
+            
+            output[i * 2] = (Sint16)left_sample;
+            output[i * 2 + 1] = (Sint16)right_sample;
+            
+            chan->position++;
+        }
+
+        if (chan->position >= chan->length)
+        {
+            if (chan->loop)
+            {
+                chan->position = 0;
+            }
+            else
+            {
+                chan->active = 0;
+            }
+        }
+    }
+    
+    SDL_UnlockMutex(audio_mutex);
+}
+
+//
+// Load sound effect from WAD
+//
+static int I_LoadSound(int sfx_id, char* sfxname)
+{
+    unsigned char* sfx;
+    int size;
+    char name[20];
+    int sfxlump;
+    int samplerate;
+    int samples;
+
     sprintf(name, "ds%s", sfxname);
 
-    if ( W_CheckNumForName(name) == -1 )
-      sfxlump = W_GetNumForName("dspistol");
+    if (W_CheckNumForName(name) == -1)
+        sfxlump = W_GetNumForName("dspistol");
     else
-      sfxlump = W_GetNumForName(name);
+        sfxlump = W_GetNumForName(name);
     
-    size = W_LumpLength( sfxlump );
-    sfx = (unsigned char*)W_CacheLumpNum( sfxlump, PU_STATIC );
+    size = W_LumpLength(sfxlump);
+    sfx = (unsigned char*)W_CacheLumpNum(sfxlump, PU_STATIC);
 
-    if (size < 8 || sfx[0] != 0x03 || sfx[1] != 0x00) {
+    if (size < 8 || sfx[0] != 0x03 || sfx[1] != 0x00)
+    {
         Z_Free(sfx);
-        return NULL;
+        return 0;
     }
 
     samplerate = sfx[2] | (sfx[3] << 8);
@@ -130,95 +196,269 @@ getsfx
     if (samples > size - 8)
         samples = size - 8;
 
-    wavsize = 44 + samples;
-    wavbuf = (unsigned char*)Z_Malloc(wavsize, PU_STATIC, 0);
+    sounds[sfx_id].data = (unsigned char*)Z_Malloc(samples, PU_STATIC, 0);
+    sounds[sfx_id].length = samples;
+    sounds[sfx_id].samplerate = samplerate;
 
-    memcpy(wavbuf, "RIFF", 4);
-    int32_t chunksize = wavsize - 8;
-    memcpy(wavbuf + 4, &chunksize, 4);
-    memcpy(wavbuf + 8, "WAVE", 4);
-
-    memcpy(wavbuf + 12, "fmt ", 4);
-    int32_t fmtsize = 16;
-    memcpy(wavbuf + 16, &fmtsize, 4);
-    int16_t format = 1; // PCM
-    memcpy(wavbuf + 20, &format, 2);
-    int16_t channels = 1; // Mono
-    memcpy(wavbuf + 22, &channels, 2);
-    int32_t srate = samplerate;
-    memcpy(wavbuf + 24, &srate, 4);
-    int32_t byterate = srate * 1 * 1; // rate * channels * bps/8
-    memcpy(wavbuf + 28, &byterate, 4);
-    int16_t blockalign = 1;
-    memcpy(wavbuf + 32, &blockalign, 2);
-    int16_t bps = 8;
-    memcpy(wavbuf + 34, &bps, 2);
-
-    memcpy(wavbuf + 36, "data", 4);
-    int32_t datasize = samples;
-    memcpy(wavbuf + 40, &datasize, 4);
-
-    memcpy(wavbuf + 44, sfx + 8, samples);
-
-    SDL_RWops* rw = SDL_RWFromMem(wavbuf, wavsize);
-    chunk = Mix_LoadWAV_RW(rw, 1); // 1 = close rwops automatically
-
+    memcpy(sounds[sfx_id].data, sfx + 8, samples);
+    
     Z_Free(sfx);
-    Z_Free(wavbuf);
+    
+    lengths[sfx_id] = samples;
+    
+    return 1;
+}
 
-    if (!chunk) {
-        fprintf(stderr, "Mix_LoadWAV_RW failed for %s: %s\n", sfxname, Mix_GetError());
-        return NULL;
+//
+// Find a free channel
+//
+static int I_FindFreeChannel(void)
+{
+    int i;
+    
+    for (i = 0; i < NUM_CHANNELS; i++)
+    {
+        if (!channels[i].active)
+            return i;
+    }
+    
+    // No free channel, stop the oldest one
+    return 0;
+}
+
+//
+// Initialize sound
+//
+void I_InitSound(void)
+{
+    SDL_AudioSpec desired;
+    int i;
+    
+    fprintf(stderr, "I_InitSound: ");
+
+    if (SDL_InitSubSystem(SDL_INIT_AUDIO) < 0)
+    {
+        fprintf(stderr, "SDL_InitSubSystem(AUDIO) failed: %s\n", SDL_GetError());
+        return;
     }
 
-    *len = samples;
-    return chunk;
+    SDL_zero(desired);
+    desired.freq = SAMPLERATE;
+    desired.format = AUDIO_S16SYS;
+    desired.channels = 2;
+    desired.samples = SAMPLECOUNT;
+    desired.callback = I_AudioCallback;
+    desired.userdata = NULL;
+
+    audio_device = SDL_OpenAudioDevice(NULL, 0, &desired, &audio_spec, SDL_AUDIO_ALLOW_FREQUENCY_CHANGE);
+    
+    if (audio_device == 0)
+    {
+        fprintf(stderr, "SDL_OpenAudioDevice failed: %s\n", SDL_GetError());
+        return;
+    }
+    
+    fprintf(stderr, "configured audio device (freq=%d, channels=%d, samples=%d)\n",
+            audio_spec.freq, audio_spec.channels, audio_spec.samples);
+
+    audio_mutex = SDL_CreateMutex();
+    if (!audio_mutex)
+    {
+        fprintf(stderr, "Failed to create audio mutex\n");
+        return;
+    }
+
+    for (i = 0; i < NUM_CHANNELS; i++)
+    {
+        memset(&channels[i], 0, sizeof(channel_t));
+    }
+
+    for (i = 0; i < NUMSFX; i++)
+    {
+        memset(&sounds[i], 0, sizeof(sound_t));
+    }
+
+    fprintf(stderr, "I_InitSound: ");
+    
+    for (i = 1; i < NUMSFX; i++)
+    {
+        if (!S_sfx[i].link)
+        {
+            I_LoadSound(i, S_sfx[i].name);
+        }
+        else
+        {
+            int link_id = S_sfx[i].link - S_sfx;
+            sounds[i] = sounds[link_id];
+            lengths[i] = lengths[link_id];
+        }
+    }
+    
+    fprintf(stderr, "pre-cached all sound data\n");
+
+    SDL_PauseAudioDevice(audio_device, 0);
+    
+    fprintf(stderr, "I_InitSound: sound module ready\n");
 }
 
-
-
-
-
 //
-// SFX API
-// Note: this was called by S_Init.
-// However, whatever they did in the
-// old DPMS based DOS version, this
-// were simply dummies in the Linux
-// version.
-// See soundserver initdata().
+// Shutdown sound
 //
-void I_SetChannels()
+void I_ShutdownSound(void)
 {
+    int i;
+    
+    if (audio_device)
+    {
+        SDL_PauseAudioDevice(audio_device, 1);
+        SDL_CloseAudioDevice(audio_device);
+        audio_device = 0;
+    }
+    
+    if (audio_mutex)
+    {
+        SDL_DestroyMutex(audio_mutex);
+        audio_mutex = NULL;
+    }
+    
+    // Free sound data
+    for (i = 0; i < NUMSFX; i++)
+    {
+        if (sounds[i].data && (!S_sfx[i].link || i == S_sfx[i].link - S_sfx))
+        {
+            Z_Free(sounds[i].data);
+            sounds[i].data = NULL;
+        }
+    }
+    
+    SDL_QuitSubSystem(SDL_INIT_AUDIO);
 }
 
- 
+//
+// Start a sound effect
+//
+int I_StartSound(int id, int vol, int sep, int pitch, int priority)
+{
+    int channel;
+    
+    (void)priority;
+    (void)pitch;
+    
+    if (id < 1 || id >= NUMSFX)
+    {
+        fprintf(stderr, "I_StartSound: invalid sound id %d\n", id);
+        return -1;
+    }
+    
+    if (!sounds[id].data)
+    {
+        fprintf(stderr, "I_StartSound: sound %d not loaded\n", id);
+        return -1;
+    }
+    
+    if (!audio_mutex)
+        return -1;
+    
+    SDL_LockMutex(audio_mutex);
+
+    channel = I_FindFreeChannel();
+
+    channels[channel].data = sounds[id].data;
+    channels[channel].length = sounds[id].length;
+    channels[channel].position = 0;
+    channels[channel].active = 1;
+    channels[channel].loop = 0;
+    channels[channel].volume = vol;
+    channels[channel].separation = sep;
+    channels[channel].pitch = pitch;
+    channels[channel].sfx_id = id;
+    
+    SDL_UnlockMutex(audio_mutex);
+    
+    return channel;
+}
+
+//
+// Stop a sound
+//
+void I_StopSound(int handle)
+{
+    if (handle < 0 || handle >= NUM_CHANNELS)
+        return;
+    
+    if (!audio_mutex)
+        return;
+    
+    SDL_LockMutex(audio_mutex);
+    channels[handle].active = 0;
+    SDL_UnlockMutex(audio_mutex);
+}
+
+//
+// Check if sound is playing
+//
+int I_SoundIsPlaying(int handle)
+{
+    int result = 0;
+    
+    if (handle < 0 || handle >= NUM_CHANNELS)
+        return 0;
+    
+    if (!audio_mutex)
+        return 0;
+    
+    SDL_LockMutex(audio_mutex);
+    result = channels[handle].active;
+    SDL_UnlockMutex(audio_mutex);
+    
+    return result;
+}
+
+//
+// Update sound parameters
+//
+void I_UpdateSoundParams(int handle, int vol, int sep, int pitch)
+{
+    (void)pitch;
+    
+    if (handle < 0 || handle >= NUM_CHANNELS)
+        return;
+    
+    if (!audio_mutex)
+        return;
+    
+    SDL_LockMutex(audio_mutex);
+    
+    if (channels[handle].active)
+    {
+        channels[handle].volume = vol;
+        channels[handle].separation = sep;
+    }
+    
+    SDL_UnlockMutex(audio_mutex);
+}
+
+//
+// Set sound volume
+//
 void I_SetSfxVolume(int volume)
 {
-  // Identical to DOS.
-  // Basically, this should propagate
-  //  the menu/config file setting
-  //  to the state variable used in
-  //  the mixing.
-  snd_SfxVolume = volume;
-
-  Mix_Volume(-1, (volume * MIX_MAX_VOLUME) / 15);
+    snd_SfxVolume = volume;
 }
 
-// MUSIC API
-void I_SetMusicVolume(int volume)
+
+void I_SetChannels(void)
 {
-  // Internal state variable.
-  snd_MusicVolume = volume;
-
-  Mix_VolumeMusic((volume * MIX_MAX_VOLUME) / 15);
 }
 
+void I_UpdateSound(void)
+{
+}
 
-//
-// Retrieve the raw data lump index
-//  for a given SFX name.
-//
+void I_SubmitSound(void)
+{
+}
+
 int I_GetSfxLumpNum(sfxinfo_t* sfx)
 {
     char namebuf[9];
@@ -227,334 +467,56 @@ int I_GetSfxLumpNum(sfxinfo_t* sfx)
 }
 
 //
-// Starting a sound means adding it
-//  to the current list of active sounds
-//  in the internal channels.
-// As the SFX info struct contains
-//  e.g. a pointer to the raw data,
-//  it is ignored.
-// As our sound handling does not handle
-//  priority, it is ignored.
-// Pitching (that is, increased speed of playback)
-//  is set, but currently not used by mixing.
-//
-int
-I_StartSound
-( int		id,
-  int		vol,
-  int		sep,
-  int		pitch,
-  int		priority )
-{
-    Mix_Chunk* chunk;
-    int channel;
-
-    priority = 0;
-    pitch = 0;
-    
-    // Debug.
-    //fprintf( stderr, "starting sound %d", id );
-
-    if (id < 1 || id >= NUMSFX) {
-        fprintf(stderr, "I_StartSound: invalid sound id %d\n", id);
-        return -1;
-    }
-    
-    chunk = sound_chunks[id];
-    if (!chunk) {
-        fprintf(stderr, "I_StartSound: sound %d not loaded\n", id);
-        return -1;
-    }
-    
-    // Set volume for this chunk (0-128 scale)
-    Mix_VolumeChunk(chunk, (vol * MIX_MAX_VOLUME) / 127);
-    
-    // Play the sound on any available channel
-    channel = Mix_PlayChannel(-1, chunk, 0);
-    
-    if (channel == -1) {
-        fprintf(stderr, "I_StartSound: Mix_PlayChannel failed: %s\n", Mix_GetError());
-        return -1;
-    }
-    
-    // Set panning (separation)
-    // sep ranges from 0 (left) to 255 (right), with 128 being center
-    // SDL_mixer uses 0-254 for SetPanning, where 127 is center
-    int left = 254 - sep;
-    int right = sep;
-    if (left < 0) left = 0;
-    if (left > 254) left = 254;
-    if (right < 0) right = 0;
-    if (right > 254) right = 254;
-    
-    Mix_SetPanning(channel, left, right);
-    
-    return channel;
-}
-
-
-
-void I_StopSound (int handle)
-{
-  // Stop the channel
-  if (handle >= 0) {
-      Mix_HaltChannel(handle);
-  }
-}
-
-
-int I_SoundIsPlaying(int handle)
-{
-    // Check if the channel is still playing
-    if (handle < 0) {
-        return 0;
-    }
-    
-    return Mix_Playing(handle);
-}
-
-
-
-
-//
-// This function loops all active (internal) sound
-//  channels, retrieves a given number of samples
-//  from the raw sound data, modifies it according
-//  to the current (internal) channel parameters,
-//  mixes the per channel samples into the global
-//  mixbuffer, clamping it to the allowed range,
-//  and sets up everything for transferring the
-//  contents of the mixbuffer to the (two)
-//  hardware channels (left and right, that is).
-//
-// This function currently supports only 16bit.
-//
-void I_UpdateSound( void )
-{
-
-}
-
-
-// 
-// This would be used to write out the mixbuffer
-//  during each game loop update.
-// Updates sound buffer and audio device at runtime. 
-// It is called during Timer interrupt with SNDINTR.
-// Mixing now done synchronous, and
-//  only output be done asynchronous?
-//
-void
-I_SubmitSound(void)
-{
-}
-
-
-
-void
-I_UpdateSoundParams
-( int	handle,
-  int	vol,
-  int	sep,
-  int	pitch)
-{
-  // Update sound parameters for a playing sound
-  if (handle < 0 || !Mix_Playing(handle)) {
-      return;
-  }
-
-  Mix_Volume(handle, (vol * MIX_MAX_VOLUME) / 127);
-
-  int left = 254 - sep;
-  int right = sep;
-  if (left < 0) left = 0;
-  if (left > 254) left = 254;
-  if (right < 0) right = 0;
-  if (right > 254) right = 254;
-  
-  Mix_SetPanning(handle, left, right);
-
-  (void)pitch;
-}
-
-
-
-
-void I_ShutdownSound(void)
-{    
-  int i;
-
-  for (i = 0; i < NUMSFX; i++) {
-      if (sound_chunks[i]) {
-          Mix_FreeChunk(sound_chunks[i]);
-          sound_chunks[i] = NULL;
-      }
-  }
-
-  Mix_CloseAudio();
-  Mix_Quit();
-}
-
-
-
-
-
-
-void
-I_InitSound()
-{ 
-  int i;
-  
-  // Secure and configure sound device first.
-  fprintf( stderr, "I_InitSound: ");
-
-  if (Mix_OpenAudio(SAMPLERATE, AUDIO_S16SYS, 2, 512) < 0)
-  {
-      fprintf(stderr, "Mix_OpenAudio failed: %s\n", Mix_GetError());
-      return;
-  }
-
-  Mix_AllocateChannels(NUM_CHANNELS);
-  
-  fprintf(stderr, "configured SDL_mixer\n");
-
-  // Initialize external data (all sounds) at start, keep static.
-  fprintf( stderr, "I_InitSound: ");
-
-  for (i = 0; i < NUMSFX; i++) {
-      sound_chunks[i] = NULL;
-  }
-  
-  for (i=1 ; i<NUMSFX ; i++)
-  { 
-    // Alias? Example is the chaingun sound linked to pistol.
-    if (!S_sfx[i].link)
-    {
-      // Load data from WAD file.
-      sound_chunks[i] = getsfx( S_sfx[i].name, &lengths[i] );
-      S_sfx[i].data = sound_chunks[i];
-    }
-    else
-    {
-      // Previously loaded already?
-      sound_chunks[i] = sound_chunks[S_sfx[i].link-S_sfx];
-      S_sfx[i].data = sound_chunks[i];
-      lengths[i] = lengths[S_sfx[i].link-S_sfx];
-    }
-  }
-
-  fprintf( stderr, " pre-cached all sound data\n");
-  
-  // Finished initialization.
-  fprintf(stderr, "I_InitSound: sound module ready\n");
-    
-}
-
-
-
-
-//
 // MUSIC API.
 //
-void I_InitMusic(void)		
+void I_InitMusic(void)
 {
-    fprintf(stderr, "I_InitMusic: music module ready\n");
+    fprintf(stderr, "I_InitMusic: music not implemented (SDL2 only)\n");
 }
 
-void I_ShutdownMusic(void)	
-{ 
-    if (current_music) {
-        Mix_FreeMusic(current_music);
-        current_music = NULL;
-    }
+void I_ShutdownMusic(void)
+{
+}
+
+void I_SetMusicVolume(int volume)
+{
+    music_volume = volume;
 }
 
 void I_PlaySong(int handle, int looping)
 {
-    Mix_Music* music = (Mix_Music*)handle;
-    
-    if (music) {
-        Mix_PlayMusic(music, looping ? -1 : 0);
-    }
+    (void)handle;
+    (void)looping;
 }
 
-void I_PauseSong (int handle)
+void I_PauseSong(int handle)
 {
     (void)handle;
-    Mix_PauseMusic();
 }
 
-void I_ResumeSong (int handle)
+void I_ResumeSong(int handle)
 {
     (void)handle;
-    Mix_ResumeMusic();
 }
 
 void I_StopSong(int handle)
 {
     (void)handle;
-    Mix_HaltMusic();
 }
 
 void I_UnRegisterSong(int handle)
 {
-    Mix_Music* music = (Mix_Music*)handle;
-    
-    if (music) {
-        Mix_FreeMusic(music);
-        if (music == current_music) {
-            current_music = NULL;
-        }
-    }
+    (void)handle;
 }
 
 int I_RegisterSong(void* data)
 {
-    SDL_RWops* rw;
-    Mix_Music* music;
-    int size = 0;
-    
-    if (!data) {
-        return 0;
-    }
-
-    for (int i=0; i<NUMMUSIC; i++) {
-        if (S_music[i].data == data) {
-            size = W_LumpLength(S_music[i].lumpnum);
-            break;
-        }
-    }
-
-    if (size == 0) {
-        size = 128 * 1024;
-    }
-
-    if (current_music) {
-        Mix_FreeMusic(current_music);
-        current_music = NULL;
-    }
-
-    rw = SDL_RWFromMem(data, size);
-    
-    if (!rw) {
-        fprintf(stderr, "I_RegisterSong: SDL_RWFromMem failed\n");
-        return 0;
-    }
-    
-    music = Mix_LoadMUS_RW(rw, 1);
-    
-    if (!music) {
-        fprintf(stderr, "I_RegisterSong: Mix_LoadMUS_RW failed: %s\n", Mix_GetError());
-        return 0;
-    }
-    
-    current_music = music;
-
-    return (int)music;
+    (void)data;
+    return 0;
 }
 
-// Is the song playing?
 int I_QrySongPlaying(int handle)
 {
     (void)handle;
-    return Mix_PlayingMusic();
+    return 0;
 }
