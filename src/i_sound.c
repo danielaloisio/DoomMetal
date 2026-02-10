@@ -127,7 +127,7 @@ static void I_AudioCallback(void* userdata, Uint8* stream, int len)
 
             Sint16 sample_16 = (Sint16)((sample - 128) << 8);
 
-            sample_16 = (sample_16 * chan->volume) / 127;
+            sample_16 = (sample_16 * chan->volume) / 40;
 
             int left_vol = 255 - chan->separation;
             int right_vol = chan->separation;
