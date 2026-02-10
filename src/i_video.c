@@ -66,6 +66,10 @@ int xlatekey(SDL_Keysym *sym)
       case SDLK_RIGHT:	rc = KEY_RIGHTARROW;	break;
       case SDLK_DOWN:	rc = KEY_DOWNARROW;	break;
       case SDLK_UP:	rc = KEY_UPARROW;	break;
+      case SDLK_a:	rc = KEY_LEFTARROW;	break;
+      case SDLK_d:	rc = KEY_RIGHTARROW;	break;
+      case SDLK_s:	rc = KEY_DOWNARROW;	break;
+      case SDLK_w:	rc = KEY_UPARROW;	break;
       case SDLK_ESCAPE:	rc = KEY_ESCAPE;	break;
       case SDLK_RETURN:	rc = KEY_ENTER;		break;
       case SDLK_TAB:	rc = KEY_TAB;		break;
