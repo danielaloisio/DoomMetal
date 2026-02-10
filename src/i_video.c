@@ -284,7 +284,11 @@ void I_InitGraphics(void)
 	multiply = 4;
 
     if (multiply == 1)
+#ifdef _WIN32
+        multiply = 3;
+#else
         multiply = 4;
+#endif
 
     int width = SCREENWIDTH * multiply;
     int height = SCREENHEIGHT * multiply;
