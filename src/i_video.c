@@ -144,9 +144,9 @@ void I_StartFrame (void)
 
 }
 
-static int	lastmousex = 0;
-static int	lastmousey = 0;
-boolean		mousemoved = false;
+static int	lastmousex = 40;
+static int	lastmousey = 40;
+static boolean	mousemoved = false;
 
 void I_GetEvent(void)
 {
@@ -172,6 +172,31 @@ void I_GetEvent(void)
                 //printf("%d", event.data1);
                 D_PostEvent(&event);
                 break;
+
+            case SDL_MOUSEBUTTONDOWN:
+            case SDL_MOUSEBUTTONUP:
+                event.type = ev_mouse;
+                event.data1 = 0;
+                if (SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_LEFT)) event.data1 |= 1;
+                //if (SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_RIGHT)) event.data1 |= 2;
+                //if (SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_MIDDLE)) event.data1 |= 4;
+                event.data2 = 0;
+                event.data3 = 0;
+                D_PostEvent(&event);
+                break;
+
+            case SDL_MOUSEMOTION:
+                if (mousemoved) {
+                    event.type = ev_mouse;
+                    event.data1 = 0;
+                    if (SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_LEFT)) event.data1 |= 1;
+                    event.data2 = sdlevent.motion.xrel * lastmousex;
+                    //event.data3 = -sdlevent.motion.yrel * lastmousey;
+                    D_PostEvent(&event);
+                }
+                break;
+
+
         }
     }
 
@@ -218,23 +243,23 @@ void I_FinishUpdate (void)
 	    screens[0][ (SCREENHEIGHT-1)*SCREENWIDTH + i] = 0xff;
 	for ( ; i<20*2 ; i+=2)
 	    screens[0][ (SCREENHEIGHT-1)*SCREENWIDTH + i] = 0x0;
-    
+
     }
 
     void *pixels;
     int pitch;
     SDL_LockTexture(texture, NULL, &pixels, &pitch);
-    
+
     uint32_t *dst = (uint32_t *)pixels;
     byte *src = screens[0];
-    
+
     for (int j = 0; j < SCREENWIDTH * SCREENHEIGHT; j++)
     {
         byte val = src[j];
         SDL_Color col = palette[val];
         dst[j] = (0xFF << 24) | (col.r << 16) | (col.g << 8) | col.b;
     }
-    
+
     SDL_UnlockTexture(texture);
     SDL_RenderCopy(renderer, texture, NULL, NULL);
     SDL_RenderPresent(renderer);
@@ -299,10 +324,10 @@ void I_InitGraphics(void)
     int height = SCREENHEIGHT * multiply;
 
     window = SDL_CreateWindow("DoomMetal",
-                              SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 
-                              width, height, 
+                              SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+                              width, height,
                               SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
-                              
+
     if (!window) {
         I_Error("SDL_CreateWindow failed: %s", SDL_GetError());
     }
@@ -311,15 +336,20 @@ void I_InitGraphics(void)
     if (!renderer) {
         I_Error("SDL_CreateRenderer failed: %s", SDL_GetError());
     }
-    
+
     SDL_RenderSetLogicalSize(renderer, SCREENWIDTH, SCREENHEIGHT);
 
-    texture = SDL_CreateTexture(renderer, 
-                                SDL_PIXELFORMAT_ARGB8888, 
-                                SDL_TEXTUREACCESS_STREAMING, 
+    texture = SDL_CreateTexture(renderer,
+                                SDL_PIXELFORMAT_ARGB8888,
+                                SDL_TEXTUREACCESS_STREAMING,
                                 SCREENWIDTH, SCREENHEIGHT);
 
     if (!texture) {
          I_Error("SDL_CreateTexture failed: %s", SDL_GetError());
+    }
+
+    if (M_CheckParm("-mousemoved")) {
+        mousemoved = true;
+        SDL_SetRelativeMouseMode(SDL_TRUE);
     }
 }
