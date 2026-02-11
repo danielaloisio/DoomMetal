@@ -62,63 +62,67 @@ int xlatekey(SDL_Keysym *sym)
 
     switch(sym->sym)
     {
-      case SDLK_LEFT:	rc = KEY_LEFTARROW;	break;
-      case SDLK_RIGHT:	rc = KEY_RIGHTARROW;	break;
-      case SDLK_DOWN:	rc = KEY_DOWNARROW;	break;
-      case SDLK_UP:	rc = KEY_UPARROW;	break;
-      case SDLK_a:	rc = KEY_LEFTARROW;	break;
-      case SDLK_d:	rc = KEY_RIGHTARROW;	break;
-      case SDLK_s:	rc = KEY_DOWNARROW;	break;
-      case SDLK_w:	rc = KEY_UPARROW;	break;
-      case SDLK_ESCAPE:	rc = KEY_ESCAPE;	break;
-      case SDLK_RETURN:	rc = KEY_ENTER;		break;
-      case SDLK_TAB:	rc = KEY_TAB;		break;
-      case SDLK_F1:	rc = KEY_F1;		break;
-      case SDLK_F2:	rc = KEY_F2;		break;
-      case SDLK_F3:	rc = KEY_F3;		break;
-      case SDLK_F4:	rc = KEY_F4;		break;
-      case SDLK_F5:	rc = KEY_F5;		break;
-      case SDLK_F6:	rc = KEY_F6;		break;
-      case SDLK_F7:	rc = KEY_F7;		break;
-      case SDLK_F8:	rc = KEY_F8;		break;
-      case SDLK_F9:	rc = KEY_F9;		break;
-      case SDLK_F10:	rc = KEY_F10;		break;
-      case SDLK_F11:	rc = KEY_F11;		break;
-      case SDLK_F12:	rc = KEY_F12;		break;
+      case SDLK_LEFT:
+            rc = KEY_LEFTARROW;	break;
+      case SDLK_RIGHT:
+            rc = KEY_RIGHTARROW; break;
+      case SDLK_DOWN:
+      case SDLK_s:
+            rc = KEY_DOWNARROW;	break;
+      case SDLK_UP:
+      case SDLK_w:
+            rc = KEY_UPARROW; break;
+      case SDLK_LESS:
+      case SDLK_a:
+            rc = KEY_STRAFELEFT; break;
+      case SDLK_GREATER:
+      case SDLK_d:
+            rc = KEY_STRAFERIGHT; break;
+      case SDLK_ESCAPE:	rc = KEY_ESCAPE; break;
+      case SDLK_RETURN:	rc = KEY_ENTER; break;
+      case SDLK_TAB:	rc = KEY_TAB; break;
+      case SDLK_F1:	rc = KEY_F1; break;
+      case SDLK_F2:	rc = KEY_F2; break;
+      case SDLK_F3:	rc = KEY_F3; break;
+      case SDLK_F4:	rc = KEY_F4; break;
+      case SDLK_F5:	rc = KEY_F5; break;
+      case SDLK_F6:	rc = KEY_F6; break;
+      case SDLK_F7:	rc = KEY_F7; break;
+      case SDLK_F8:	rc = KEY_F8; break;
+      case SDLK_F9:	rc = KEY_F9; break;
+      case SDLK_F10:	rc = KEY_F10; break;
+      case SDLK_F11:	rc = KEY_F11; break;
+      case SDLK_F12:	rc = KEY_F12; break;
 	
       case SDLK_BACKSPACE:
       case SDLK_DELETE:	rc = KEY_BACKSPACE;	break;
 
-      case SDLK_PAUSE:	rc = KEY_PAUSE;		break;
+      case SDLK_PAUSE:	rc = KEY_PAUSE;	break;
 
-      case SDLK_EQUALS:	rc = KEY_EQUALS;	break;
+      case SDLK_EQUALS:	rc = KEY_EQUALS; break;
 
-      case SDLK_MINUS:	rc = KEY_MINUS;		break;
+      case SDLK_MINUS:	rc = KEY_MINUS; break;
 
       case SDLK_LSHIFT:
       case SDLK_RSHIFT:
-	rc = KEY_RSHIFT;
-	break;
+	        rc = KEY_RSHIFT; break;
 	
       case SDLK_LCTRL:
       case SDLK_RCTRL:
-	rc = KEY_RCTRL;
-	break;
+	        rc = KEY_RCTRL; break;
 	
       case SDLK_LALT:
       case SDLK_LGUI:
       case SDLK_RALT:
       case SDLK_RGUI:
-	rc = KEY_RALT;
-	break;
-	
+	        rc = KEY_RALT; break;
+
       default:
-	rc = sym->sym;
-	break;
+	        rc = sym->sym; break;
+
     }
 
     return rc;
-
 }
 
 void I_ShutdownGraphics(void)
@@ -165,6 +169,7 @@ void I_GetEvent(void)
             case SDL_KEYUP:
                 event.type = ev_keyup;
                 event.data1 = xlatekey(&sdlevent.key.keysym);
+                //printf("%d", event.data1);
                 D_PostEvent(&event);
                 break;
         }
