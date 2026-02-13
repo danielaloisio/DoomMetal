@@ -146,7 +146,6 @@ void I_StartFrame (void)
 
 static int	lastmousex = 10;
 static int	lastmousey = 10;
-static boolean	mousemoved = false;
 
 void I_GetEvent(void)
 {
