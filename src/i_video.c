@@ -146,7 +146,6 @@ void I_StartFrame (void)
 
 static int	lastmousex = 10;
 static int	lastmousey = 10;
-static boolean	mousemoved = false;
 
 void I_GetEvent(void)
 {
@@ -353,10 +352,5 @@ void I_InitGraphics(void)
 
     if (!texture) {
          I_Error("SDL_CreateTexture failed: %s", SDL_GetError());
-    }
-
-    if (M_CheckParm("-mousemoved")) {
-        mousemoved = true;
-        SDL_SetRelativeMouseMode(SDL_TRUE);
     }
 }
