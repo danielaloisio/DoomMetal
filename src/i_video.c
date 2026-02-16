@@ -125,6 +125,16 @@ int xlatekey(SDL_Keysym *sym)
     return rc;
 }
 
+void I_MouseState(event_t *event)
+{
+    if (SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_LEFT))
+        event->data1 |= 1;
+    if (SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_RIGHT))
+        event->data1 |= 2;
+    if (SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_MIDDLE))
+        event->data1 |= 4;
+}
+
 void I_ShutdownGraphics(void)
 {
   if (texture) SDL_DestroyTexture(texture);
@@ -177,12 +187,7 @@ void I_GetEvent(void)
                 event.type = ev_mouse;
                 event.data1 = 0;
 
-                if (SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_LEFT))
-                    event.data1 |= 1;
-                if (SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_RIGHT))
-                    event.data1 |= 2;
-                if (SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_MIDDLE))
-                    event.data1 |= 4;
+                I_MouseState(&event);
                 
                 event.data2 = 0;
                 event.data3 = 0;
@@ -192,13 +197,8 @@ void I_GetEvent(void)
             case SDL_MOUSEMOTION:
                 event.type = ev_mouse;
                 event.data1 = 0;
-                
-                if (sdlevent.button.state & SDL_BUTTON_LMASK)
-                    event.data1 |= 1;
-                if (sdlevent.button.state & SDL_BUTTON_RMASK) 
-                    event.data1 |= 2;
-                if (sdlevent.button.state & SDL_BUTTON_MMASK) 
-                    event.data1 |= 4;
+
+                I_MouseState(&event);
                 
                 event.data2 = sdlevent.motion.xrel * lastmousex;
                 event.data3 = -sdlevent.motion.yrel * lastmousey;
