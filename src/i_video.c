@@ -176,12 +176,12 @@ void I_GetEvent(void)
             case SDL_MOUSEBUTTONUP:
                 event.type = ev_mouse;
                 event.data1 = 0;
-                
-                if (sdlevent.button.button == SDL_BUTTON_LEFT) 
+
+                if (SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_LEFT))
                     event.data1 |= 1;
-                if (sdlevent.button.button == SDL_BUTTON_RIGHT) 
+                if (SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_RIGHT))
                     event.data1 |= 2;
-                if (sdlevent.button.button == SDL_BUTTON_MIDDLE) 
+                if (SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_MIDDLE))
                     event.data1 |= 4;
                 
                 event.data2 = 0;
@@ -193,7 +193,7 @@ void I_GetEvent(void)
                 event.type = ev_mouse;
                 event.data1 = 0;
                 
-                if (sdlevent.button.state & SDL_BUTTON_LMASK) 
+                if (sdlevent.button.state & SDL_BUTTON_LMASK)
                     event.data1 |= 1;
                 if (sdlevent.button.state & SDL_BUTTON_RMASK) 
                     event.data1 |= 2;
