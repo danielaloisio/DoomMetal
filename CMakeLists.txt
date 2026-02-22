@@ -1,9 +1,6 @@
 cmake_minimum_required(VERSION 3.21)
 project(DoomMetal)
 
-set(CMAKE_BUILD_TYPE Debug)
-set(CMAKE_C_FLAGS_DEBUG "-g -O0")
-set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")
 add_definitions(-U__BIG_ENDIAN__ -DNORMALUNIX)
 
 find_package(SDL2 REQUIRED)
