@@ -77,7 +77,6 @@ add_executable(DoomMetal
 
 target_link_libraries(DoomMetal
         ${SDL2_LIBRARIES}
-        m
 )
 
 target_include_directories(DoomMetal PRIVATE ${SDL2_INCLUDE_DIRS})
