@@ -127,12 +127,11 @@ int xlatekey(SDL_Keysym *sym)
 
 void I_MouseState(event_t *event)
 {
-    if (SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_LEFT))
-        event->data1 |= 1;
-    if (SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_RIGHT))
-        event->data1 |= 2;
-    if (SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_MIDDLE))
-        event->data1 |= 4;
+    Uint32 buttons = SDL_GetMouseState(NULL, NULL);
+    event->data1 = 0;
+    if (buttons & SDL_BUTTON(SDL_BUTTON_LEFT))   event->data1 |= 1;
+    if (buttons & SDL_BUTTON(SDL_BUTTON_RIGHT))  event->data1 |= 2;
+    if (buttons & SDL_BUTTON(SDL_BUTTON_MIDDLE)) event->data1 |= 4;
 }
 
 void I_ShutdownGraphics(void)
@@ -154,14 +153,14 @@ void I_StartFrame (void)
 
 }
 
-static int	lastmousex = 10;
-static int	lastmousey = 10;
+static int mouse_dx = 0;
+static int mouse_dy = 0;
 
 void I_GetEvent(void)
 {
     SDL_Event sdlevent;
     event_t event;
-    
+
     while (SDL_PollEvent(&sdlevent))
     {
         switch (sdlevent.type)
@@ -169,42 +168,46 @@ void I_GetEvent(void)
             case SDL_QUIT:
                 I_Quit();
                 break;
-                
+
             case SDL_KEYDOWN:
                 event.type = ev_keydown;
                 event.data1 = xlatekey(&sdlevent.key.keysym);
                 D_PostEvent(&event);
                 break;
-                
+
             case SDL_KEYUP:
                 event.type = ev_keyup;
                 event.data1 = xlatekey(&sdlevent.key.keysym);
                 D_PostEvent(&event);
                 break;
-                
+
             case SDL_MOUSEBUTTONDOWN:
             case SDL_MOUSEBUTTONUP:
+            {
                 event.type = ev_mouse;
-                event.data1 = 0;
-
                 I_MouseState(&event);
-                
                 event.data2 = 0;
                 event.data3 = 0;
                 D_PostEvent(&event);
                 break;
-                
-            case SDL_MOUSEMOTION:
-                event.type = ev_mouse;
-                event.data1 = 0;
+            }
 
-                I_MouseState(&event);
-                
-                event.data2 = sdlevent.motion.xrel * lastmousex;
-                event.data3 = -sdlevent.motion.yrel * lastmousey;
-                D_PostEvent(&event);
+            case SDL_MOUSEMOTION:
+                mouse_dx += sdlevent.motion.xrel;
+                mouse_dy += sdlevent.motion.yrel;
                 break;
         }
+    }
+
+    if (mouse_dx != 0 || mouse_dy != 0)
+    {
+        event.type = ev_mouse;
+        I_MouseState(&event);
+        event.data2 = mouse_dx;
+        event.data3 = -mouse_dy;
+        D_PostEvent(&event);
+        mouse_dx = 0;
+        mouse_dy = 0;
     }
 }
 
